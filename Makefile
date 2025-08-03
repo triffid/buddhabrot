@@ -16,15 +16,15 @@ LIBRARIES := m
 PACKAGES  := vulkan sdl2 stb glfw3 fmt imgui
 
 # vk-bootstrap
-CXXSRC    += extern/vk-bootstrap/src/VkBootstrap.cpp
-INC       += extern/vk-bootstrap/src
-RM_BDIRS  += extern/vk-bootstrap/src extern/vk-bootstrap
+# CXXSRC    += extern/vk-bootstrap/src/VkBootstrap.cpp
+# INC       += extern/vk-bootstrap/src
+# RM_BDIRS  += extern/vk-bootstrap/src extern/vk-bootstrap
 
 # Vulkan-Memory-Allocator
 # CXXSRC    +=
 # INC       += extern/VulkanMemoryAllocator/include
 
-RM_BDIRS  += extern
+# RM_BDIRS  += extern
 
 OBJ       := $(patsubst %.cpp,$(O)/%.o,$(CXXSRC))
 

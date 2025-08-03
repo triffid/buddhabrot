@@ -1,0 +1,47 @@
+#version 450
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+layout(binding = 0) readonly buffer InData { // Input buffer binding
+	dvec2 data[32][32];
+} inputData;
+
+layout(binding = 1) writeonly buffer OutData { // Output buffer binding
+	dvec2 data[8192][32][32];
+} outputData;
+
+dvec2 squareComplex(dvec2 number){
+	return dvec2(
+		(number.x * number.x) - (number.y * number.y),
+				 2.0lf * number.x * number.y
+	);
+}
+
+double sqlen(dvec2 vec) {
+	return (vec.x * vec.x) + (vec.y * vec.y);
+}
+
+void main() {
+// 	uint index = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * 32; // Index of current thread
+
+	dvec2 c = inputData.data[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y];
+	dvec2 z = {0, 0};
+
+// 	int length = sizeof(outputData.data) / sizeof(outputData.data[0]);
+	uint length = 8192;
+
+	for (int i = 0; i < length; i++)
+	{
+		z = squareComplex(z) + c;
+		if (sqlen(z) >= 4.0lf) {
+			outputData.data[0][gl_LocalInvocationID.x][gl_LocalInvocationID.y] = dvec2(0, 0);
+			return;
+		}
+		outputData.data[i][gl_LocalInvocationID.x][gl_LocalInvocationID.y] = z;
+	}
+
+//    if (index < length(inputData.data)) {
+// 	  outputData.data[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y][0].x = inputData.data[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y].y * 3.14159265358979323846264338327950288419716939937510;
+// 	  outputData.data[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y][0].y = inputData.data[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y].x * 2.71828182845904523536028747135266249775724709369995;
+//    }
+}
