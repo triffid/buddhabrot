@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <ctime>
+#include <cmath>
 
 #include <iostream>
 #include <fstream>
@@ -11,6 +12,7 @@
 #include <vulkan/vk_enum_string_helper.h>
 
 #include <glm/glm.hpp>
+#include <fmt/format.h>
 
 #include <sys/param.h>
 #include <fcntl.h>
@@ -635,7 +637,7 @@ int main() {
 			vkMapMemory(device, deviceMemory_host, 0, inBufferBytes, 0, (void**) &inVals);
 
 			for (unsigned i = 0; i < (work_size * work_size); i++) {
-				double worksize = 4.0/work_size - 2.0;
+				// double worksize = 4.0/work_size - 2.0;
 				// inVals[i].x = (i / work_size) * 4.0/work_size - 2.0 + (4.0 / work_size / 2.0);
 				// inVals[i].y = (i % work_size) * 4.0/work_size - 2.0 + (4.0 / work_size / 2.0);
 				// inVals[i].x = (i / work_size) * 4.0/work_size - 2.0 + frand01() * worksize;
@@ -680,7 +682,7 @@ int main() {
 			siprefix10(thistime, thistime_v, thistime_s);
 			siprefix10(avgtime, avgtime_v, avgtime_s);
 
-			fprintf(stderr, "\r%u/%u: %g%cs, %g%cs average\e[K", runc, iterations, thistime_v, thistime_s, avgtime_v, avgtime_s);
+			fprintf(stderr, "\r%u/%u: %g%cs, %g%cs average\e[K", (runc + 1), iterations, thistime_v, thistime_s, avgtime_v, avgtime_s);
 
 			/*
 			*****************************************
@@ -692,23 +694,35 @@ int main() {
 			for (unsigned i = 0; i < (work_size * work_size); i++) {
 				if ((outVals[i * out_count].x != 0) ||
 					(outVals[i * out_count].y != 0)) {
-					// printf("{%u,%u: %g,%g}\t", i / work_size, i % work_size, outVals[i * out_count].x, outVals[i * out_count].y);
-					unsigned lastx = res + 1, lasty = res + 1;
+					unsigned count;
 					for (unsigned j = 0; j < out_count; j++) {
-						// printf("       %g,%g\n", outVals[i * out_count + j].x, outVals[i * out_count + j].y);
-						if ((fabs(outVals[i * out_count + j].x) < 2) &&
-							(fabs(outVals[i * out_count + j].y) < 2)) {
-							unsigned x = ((outVals[i * out_count + j].x + 2.0) / 4.0) * res;
-							unsigned y = ((outVals[i * out_count + j].y + 2.0) / 4.0) * res;
-							if (((x != 4096) || (y != 4096)) && ((x != lastx) && (y != lasty))) {
-								// printf("[%u,%u]", x, y);
-								imgfl[x + (res * y)] += 1;
-								lastx = x;
-								lasty = y;
-							}
-						}
-						else
+						if ((fabs(outVals[i * out_count + j].x) >= 2) ||
+							(fabs(outVals[i * out_count + j].y) >= 2))
 							j = out_count;
+						if ((outVals[i * out_count + j].x == 0) &&
+							(outVals[i * out_count + j].y == 0))
+							j = out_count;
+						count = j;
+					}
+					// printf("{%u,%u: %g,%g: %u}\t", i / work_size, i % work_size, outVals[i * out_count].x, outVals[i * out_count].y, count);
+					if (count >= 8192) {
+						unsigned lastx = res + 1, lasty = res + 1;
+						for (unsigned j = 0; j < out_count; j++) {
+							// printf("       %g,%g\n", outVals[i * out_count + j].x, outVals[i * out_count + j].y);
+							if ((fabs(outVals[i * out_count + j].x) < 2) &&
+								(fabs(outVals[i * out_count + j].y) < 2)) {
+								unsigned x = ((outVals[i * out_count + j].x + 2.0) / 4.0) * res;
+								unsigned y = ((outVals[i * out_count + j].y + 2.0) / 4.0) * res;
+								if (((x != 4096) || (y != 4096)) && ((x != lastx) && (y != lasty))) {
+									// printf("[%u,%u]", x, y);
+									imgfl[x + (res * y)] += 1;
+									lastx = x;
+									lasty = y;
+								}
+							}
+							else
+								j = out_count;
+						}
 					}
 					// printf("\n");
 				}
@@ -718,7 +732,24 @@ int main() {
 			}
 
 			vkUnmapMemory(device, deviceMemory_host);
+		}
 
+		{
+			clock_gettime(CLOCK_MONOTONIC, &endTime);
+			std::string elapsedtime_str = "";
+			float etime = (endTime.tv_sec - firstTime.tv_sec) + (endTime.tv_nsec - firstTime.tv_nsec) / 1000000000.0;
+			if (etime > 3600) {
+				int h = floor(etime / 3600);
+				elapsedtime_str = fmt::format("{:d}h", h);
+				etime -= floor(etime / 3600) * 3600;
+			}
+			if (etime > 60) {
+				int m = floor(etime / 60);
+				elapsedtime_str += fmt::format("{:d}m", m);
+				etime -= floor(etime / 60) * 60;
+			}
+			elapsedtime_str += fmt::format("{:g}s", etime);
+			printf("\n%u units in %s\n", iterations, elapsedtime_str.c_str());
 		}
 
 		/*
@@ -819,9 +850,10 @@ int main() {
 
 		rgb_t* img = new rgb_t[res*res];
 		for (unsigned i = 0; i < (res * res); i++) {
-			double val = std::min(1.0, std::max(0.0, imgfl[i] * (1.0 / max2)));
+			double val = pow(std::min(1.0, std::max(0.0, imgfl[i] * (1.0 / max2))), 1.0 / 2);
 			imgfl_t  v = pow(3.0 * pow(val, 2) - 2.0 * pow(val, 3), 0.2) * 255;
-			// imgfl_t  v = (imgfl[i] * (1.0 / max2)) * 255;
+			// imgfl_t  v = (val * val * val * (val * (6.0 * val - 15.0) + 10.0)) * 255;
+			// imgfl_t  v = val * 255;
 			unsigned x = i / res;
 			unsigned y = i % res;
 			unsigned newi = y * res + x;
