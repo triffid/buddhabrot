@@ -3,15 +3,15 @@
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 const uint length = 16384;
-const uint worksize = 127;
+const uint worksize = 16130;
 const uint minsteps = 8000;
 
 layout(binding = 0) readonly buffer InData { // Input buffer binding
-	dvec2 data[worksize][worksize];
+	dvec2 data[];
 } inputData;
 
 layout(binding = 1) writeonly buffer OutData { // Output buffer binding
-	dvec2 data[worksize][worksize][length];
+	dvec2 data[][length];
 } outputData;
 
 dvec2 squareComplex(dvec2 number){
@@ -27,33 +27,27 @@ double sqlen(dvec2 vec) {
 
 void main() {
 	uint myx = gl_WorkGroupID.x;
-	uint myy = gl_WorkGroupID.y;
 
 // 	uint index = myx + myy * 32; // Index of current thread
 
-	dvec2 c = inputData.data[myx][myy];
+	dvec2 c = inputData.data[myx];
 	dvec2 z = dvec2(0, 0);
 
 // 	int length = sizeof(outputData.data) / sizeof(outputData.data[0]);
 
 	for (int i = 0; i < length; i++)
-		outputData.data[myx][myy][i] = dvec2(0, 0);
+		outputData.data[myx][i] = dvec2(0, 0);
 
 	for (int i = 0; i < length; i++)
 	{
 		z = squareComplex(z) + c;
 		if (sqlen(z) >= 4.0lf) {
-			outputData.data[myx][myy][i] = dvec2(4, 4);
+			outputData.data[myx][i] = dvec2(4, 4);
 			if (i < minsteps)
-				outputData.data[myx][myy][0] = dvec2(0, 0);
+				outputData.data[myx][0] = dvec2(0, 0);
 			return;
 		}
-		outputData.data[myx][myy][i] = z;
+		outputData.data[myx][i] = z;
 	}
-	outputData.data[myx][myy][0] = dvec2(0, 0);
-
-//    if (index < length(inputData.data)) {
-// 	  outputData.data[myx][myy][0].x = inputData.data[myx][myy].y * 3.14159265358979323846264338327950288419716939937510;
-// 	  outputData.data[myx][myy][0].y = inputData.data[myx][myy].x * 2.71828182845904523536028747135266249775724709369995;
-//    }
+	outputData.data[myx][0] = dvec2(0, 0);
 }

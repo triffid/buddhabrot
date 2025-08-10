@@ -33,7 +33,7 @@ float frand01() {
 	return PRNG(0) / 4294967296.0f;
 }
 
-const unsigned work_size = 127;
+const unsigned work_size = 16130;
 const unsigned out_count = 16384;
 
 const unsigned res = 8192;
@@ -458,8 +458,8 @@ int main() {
 		VKASSERT(vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer));
 
 		VkBuffer inBuffer_vram, outBuffer_vram, inBuffer_host, outBuffer_host;
-		unsigned long inBufferBytes = work_size * work_size * sizeof(glm::dvec2);
-		unsigned long outBufferBytes = work_size * work_size * sizeof(glm::dvec2) * out_count;
+		unsigned long inBufferBytes = work_size * sizeof(glm::dvec2);
+		unsigned long outBufferBytes = work_size * sizeof(glm::dvec2) * out_count;
 		unsigned long bufferBytes = inBufferBytes + outBufferBytes;
 
 		{
@@ -612,7 +612,7 @@ int main() {
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
 		// Dispatch compute shader
-		vkCmdDispatch(commandBuffer, work_size, work_size, 1);
+		vkCmdDispatch(commandBuffer, work_size, 1, 1);
 
 		VkBufferCopy bufferCopy2 {
 			.srcOffset = 0,
@@ -636,7 +636,7 @@ int main() {
 			glm::dvec2* inVals;
 			vkMapMemory(device, deviceMemory_host, 0, inBufferBytes, 0, (void**) &inVals);
 
-			for (unsigned i = 0; i < (work_size * work_size); i++) {
+			for (unsigned i = 0; i < work_size; i++) {
 				// double worksize = 4.0/work_size - 2.0;
 				// inVals[i].x = (i / work_size) * 4.0/work_size - 2.0 + (4.0 / work_size / 2.0);
 				// inVals[i].y = (i % work_size) * 4.0/work_size - 2.0 + (4.0 / work_size / 2.0);
@@ -691,7 +691,7 @@ int main() {
 			glm::dvec2* outVals;
 			vkMapMemory(device, deviceMemory_host, inBufferBytes, outBufferBytes, 0, (void**) &outVals);
 
-			for (unsigned i = 0; i < (work_size * work_size); i++) {
+			for (unsigned i = 0; i < work_size; i++) {
 				if ((outVals[i * out_count].x != 0) ||
 					(outVals[i * out_count].y != 0)) {
 					unsigned count;
@@ -704,7 +704,7 @@ int main() {
 							j = out_count;
 						count = j;
 					}
-					// printf("{%u,%u: %g,%g: %u}\t", i / work_size, i % work_size, outVals[i * out_count].x, outVals[i * out_count].y, count);
+					// printf("{%u: %g,%g: %u}\t", i, outVals[i * out_count].x, outVals[i * out_count].y, count);
 					if (count >= 8192) {
 						unsigned lastx = res + 1, lasty = res + 1;
 						for (unsigned j = 0; j < out_count; j++) {
@@ -727,7 +727,7 @@ int main() {
 					// printf("\n");
 				}
 				else {
-					// printf("{%u,%u: %g,%g}\t", i / work_size, i % work_size, outVals[i * out_count].x, outVals[i * out_count].y);
+					// printf("{%u: %g,%g}\t", i, outVals[i * out_count].x, outVals[i * out_count].y);
 				}
 			}
 
