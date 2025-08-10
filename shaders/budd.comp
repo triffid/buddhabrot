@@ -1,13 +1,16 @@
 #version 450
 
-layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+const uint length = 16384;
+const uint worksize = 126;
 
 layout(binding = 0) readonly buffer InData { // Input buffer binding
-	dvec2 data[32][32];
+	dvec2 data[worksize][worksize];
 } inputData;
 
 layout(binding = 1) writeonly buffer OutData { // Output buffer binding
-	dvec2 data[8192][32][32];
+	dvec2 data[worksize][worksize][length];
 } outputData;
 
 dvec2 squareComplex(dvec2 number){
@@ -22,26 +25,44 @@ double sqlen(dvec2 vec) {
 }
 
 void main() {
-// 	uint index = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * 32; // Index of current thread
+	uint myx = gl_WorkGroupID.x;
+	uint myy = gl_WorkGroupID.y;
 
-	dvec2 c = inputData.data[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y];
-	dvec2 z = {0, 0};
+// 	uint index = myx + myy * 32; // Index of current thread
+
+	dvec2 c = inputData.data[myx][myy];
+	dvec2 z = dvec2(0, 0);
 
 // 	int length = sizeof(outputData.data) / sizeof(outputData.data[0]);
-	uint length = 8192;
 
-	for (int i = 0; i < length; i++)
-	{
-		z = squareComplex(z) + c;
-		if (sqlen(z) >= 4.0lf) {
-			outputData.data[0][gl_LocalInvocationID.x][gl_LocalInvocationID.y] = dvec2(0, 0);
-			return;
+	if (true) {
+		for (int i = 0; i < length; i++)
+		{
+			z = squareComplex(z) + c;
+			if (sqlen(z) >= 4.0lf) {
+				outputData.data[myx][myy][i] = dvec2(4, 4);
+				return;
+			}
+// 			if (sqlen(z) <= 0.01lf) {
+// 				outputData.data[myx][myy][0] = dvec2(0, 0);
+// 				return;
+// 			}
+			outputData.data[myx][myy][i] = z;
 		}
-		outputData.data[i][gl_LocalInvocationID.x][gl_LocalInvocationID.y] = z;
+		outputData.data[myx][myy][0] = dvec2(4, 4);
+	}
+	else {
+		for (int i = 0; i < length; i++)
+		{
+			// debug
+			// outputData.data[myx][myy][i] = dvec2(myx % 32, myy % 32);
+// 			outputData.data[myx][myy][i] = dvec2(i, (myx % 32) * 32 + (myy % 32));
+			outputData.data[myx][myy][i] = dvec2(c.x, c.y);
+		}
 	}
 
 //    if (index < length(inputData.data)) {
-// 	  outputData.data[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y][0].x = inputData.data[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y].y * 3.14159265358979323846264338327950288419716939937510;
-// 	  outputData.data[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y][0].y = inputData.data[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y].x * 2.71828182845904523536028747135266249775724709369995;
+// 	  outputData.data[myx][myy][0].x = inputData.data[myx][myy].y * 3.14159265358979323846264338327950288419716939937510;
+// 	  outputData.data[myx][myy][0].y = inputData.data[myx][myy].x * 2.71828182845904523536028747135266249775724709369995;
 //    }
 }

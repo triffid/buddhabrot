@@ -1,7 +1,6 @@
-# blah
-PROJECT = buddhabrot
+PROJECT   := buddhabrot
 
-O ?= build
+O         ?= build
 
 TOOLCHAIN_PATH ?=
 ARCH      ?=
@@ -13,7 +12,7 @@ RM_BDIRS  := $(shell find src/ -type d | sort -r)
 RM_BDIRS  += shaders
 
 LIBRARIES := m
-PACKAGES  := vulkan sdl2 stb glfw3 fmt imgui
+PACKAGES  := vulkan stb fmt # sdl2 glfw3 imgui
 
 # vk-bootstrap
 # CXXSRC    += extern/vk-bootstrap/src/VkBootstrap.cpp
@@ -31,14 +30,15 @@ OBJ       := $(patsubst %.cpp,$(O)/%.o,$(CXXSRC))
 FLAGS     := -O2 -g -march=native
 
 CXXFLAGS  := $(FLAGS)
-CXXFLAGS  += -Wall -Werror -Wno-error=unused-but-set-variable -Wno-error=unused-variable -std=gnu++20 -pipe -fno-rtti
-CXXFLAGS  += $(foreach PACK,$(PACKAGES),$(shell pkgconf --cflags $(PACK)))
+CXXFLAGS  += -std=gnu++20 -pipe
+CXXFLAGS  += -Wall -Werror -Wno-error=unused-but-set-variable -Wno-error=unused-variable
+CXXFLAGS  += $(shell pkgconf --cflags $(PACKAGES))
 CXXFLAGS  += $(patsubst %,-I%,$(INC))
 
 LDFLAGS   := $(FLAGS) -pie -Wl,-Map=$(O)/$(PROJECT).map
 
 LIBS      := $(patsubst %,-l%,$(LIBRARIES))
-LIBS      += $(foreach PACK,$(PACKAGES),$(shell pkgconf --libs $(PACK)))
+LIBS      += $(shell pkgconf --libs $(PACKAGES))
 
 CC        := $(TOOLCHAIN_PATH)$(PREFIX)gcc
 CXX       := $(TOOLCHAIN_PATH)$(PREFIX)g++
@@ -61,7 +61,7 @@ SPVLIST   := $(patsubst %,$(O)/%.spv,$(SHADERS))
 DEP       := $(patsubst %.o,%.d,$(OBJ)) $(patsubst %.spv,%.spv.d,$(SPVLIST))
 
 ifeq (,$(VERBOSE))
-QUIET:=@
+QUIET     := @
 endif
 
 .PHONY: all clean run debug
@@ -72,7 +72,7 @@ clean:
 	@echo "  RM    " $(O)/$(PROJECT) $(OBJ) $(DEP) $(SPVLIST) $(O)/$(PROJECT).map $(O)/textures $(O)/models
 	$(QUIET)$(RM) $(O)/$(PROJECT) $(OBJ) $(DEP) $(SPVLIST) $(O)/$(PROJECT).map $(O)/textures $(O)/models
 	@echo "  RMDIR " $(patsubst %,$(O)/%,$(RM_BDIRS)) $(O)
-	$(QUIET)$(RMDIR) $(patsubst %,$(O)/%,$(RM_BDIRS)) $(O) || true
+	-$(QUIET)$(RMDIR) $(patsubst %,$(O)/%,$(RM_BDIRS)) $(O)
 
 run: all #| $(O)/models $(O)/textures
 	@cd $(O); ./$(PROJECT)
