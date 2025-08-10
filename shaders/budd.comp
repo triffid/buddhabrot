@@ -3,7 +3,8 @@
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 const uint length = 16384;
-const uint worksize = 126;
+const uint worksize = 127;
+const uint minsteps = 8000;
 
 layout(binding = 0) readonly buffer InData { // Input buffer binding
 	dvec2 data[worksize][worksize];
@@ -35,31 +36,21 @@ void main() {
 
 // 	int length = sizeof(outputData.data) / sizeof(outputData.data[0]);
 
-	if (true) {
-		for (int i = 0; i < length; i++)
-		{
-			z = squareComplex(z) + c;
-			if (sqlen(z) >= 4.0lf) {
-				outputData.data[myx][myy][i] = dvec2(4, 4);
-				return;
-			}
-// 			if (sqlen(z) <= 0.01lf) {
-// 				outputData.data[myx][myy][0] = dvec2(0, 0);
-// 				return;
-// 			}
-			outputData.data[myx][myy][i] = z;
+	for (int i = 0; i < length; i++)
+		outputData.data[myx][myy][i] = dvec2(0, 0);
+
+	for (int i = 0; i < length; i++)
+	{
+		z = squareComplex(z) + c;
+		if (sqlen(z) >= 4.0lf) {
+			outputData.data[myx][myy][i] = dvec2(4, 4);
+			if (i < minsteps)
+				outputData.data[myx][myy][0] = dvec2(0, 0);
+			return;
 		}
-		outputData.data[myx][myy][0] = dvec2(4, 4);
+		outputData.data[myx][myy][i] = z;
 	}
-	else {
-		for (int i = 0; i < length; i++)
-		{
-			// debug
-			// outputData.data[myx][myy][i] = dvec2(myx % 32, myy % 32);
-// 			outputData.data[myx][myy][i] = dvec2(i, (myx % 32) * 32 + (myy % 32));
-			outputData.data[myx][myy][i] = dvec2(c.x, c.y);
-		}
-	}
+	outputData.data[myx][myy][0] = dvec2(0, 0);
 
 //    if (index < length(inputData.data)) {
 // 	  outputData.data[myx][myy][0].x = inputData.data[myx][myy].y * 3.14159265358979323846264338327950288419716939937510;

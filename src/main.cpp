@@ -31,7 +31,7 @@ float frand01() {
 	return PRNG(0) / 4294967296.0f;
 }
 
-const unsigned work_size = 126;
+const unsigned work_size = 127;
 const unsigned out_count = 16384;
 
 const unsigned res = 8192;
@@ -43,7 +43,7 @@ static std::string ComputeShaderCode = "";
 
 typedef uint32_t imgfl_t;
 
-unsigned iterations = 64;
+unsigned iterations = 256;
 
 static VkBool32 debugCallback2(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 							   VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -82,17 +82,17 @@ std::string readFileIntoString(const std::string& filename)
 }
 
 // 1k = 1000, 1M = 1000000
-void siprefix10(double value, double* display, char* prefix) {
+void siprefix10(double value, double& display, char& prefix) {
 	double gr = MIN(MAX((int) floor(log10(value) / 3), -10), 10);
-	*display = value / powf(10, 3 * gr);
-	*prefix = "qryzafpnum_kMGTPEZYRQ"[((int) gr) + 10];
+	display = value / powf(10, 3 * gr);
+	prefix = "qryzafpnum_kMGTPEZYRQ"[((int) gr) + 10];
 }
 
 // 1k = 1024, 1M = 1048576
-void siprefix2(double value, double* display, char* prefix) {
+void siprefix2(double value, double& display, char& prefix) {
 	double gr = MIN(MAX((int) floor(log2(value) / 10), -10), 10);
-	*display = value / powf(2, 10 * gr);
-	*prefix = "qryzafpnum_kMGTPEZYRQ"[((int) gr) + 10];
+	display = value / powf(2, 10 * gr);
+	prefix = "qryzafpnum_kMGTPEZYRQ"[((int) gr) + 10];
 }
 
 int main() {
@@ -113,7 +113,7 @@ int main() {
 	if (!imgfl) {
 		double d;
 		char s;
-		siprefix2(res*res*sizeof(imgfl_t), &d, &s);
+		siprefix2(res*res*sizeof(imgfl_t), d, s);
 		fprintf(stderr, "Failed to allocate %g%cB for image map\n", d, s);
 		exit(1);
 	}
@@ -197,7 +197,7 @@ int main() {
 
 				double sizeNum;
 				char sizeSuf;
-				siprefix2(heap.size, &sizeNum, &sizeSuf);
+				siprefix2(heap.size, sizeNum, sizeSuf);
 
 				printf("\tMemory Heap %u has %g%cB and flags 0x%04x (%s)\n", i, sizeNum, sizeSuf, heap.flags, heapstr.c_str());
 			}
@@ -210,7 +210,7 @@ int main() {
 
 				double sizeNum;
 				char sizeSuf;
-				siprefix2(heap.size, &sizeNum, &sizeSuf);
+				siprefix2(heap.size, sizeNum, sizeSuf);
 
 				printf("\tMemory Type %u uses heap %u (%g%cB, %s) and has flags 0x%04x (%s)\n", i, type.heapIndex, sizeNum, sizeSuf, heapstr.c_str(), type.propertyFlags, flagstr.c_str());
 
@@ -464,9 +464,9 @@ int main() {
 			double inBufNum, outBufNum, totBufNum;
 			char inBufSuf, outBufSuf, totBufSuf;
 
-			siprefix2(inBufferBytes, &inBufNum, &inBufSuf);
-			siprefix2(outBufferBytes, &outBufNum, &outBufSuf);
-			siprefix2(bufferBytes, &totBufNum, &totBufSuf);
+			siprefix2(inBufferBytes, inBufNum, inBufSuf);
+			siprefix2(outBufferBytes, outBufNum, outBufSuf);
+			siprefix2(bufferBytes, totBufNum, totBufSuf);
 
 			printf("\t--- in Buffer: %g%cB\n\t--- out Buffer: %g%cB\n\t--- total Buffer: %g%cB\n",
 				inBufNum, inBufSuf,
@@ -622,6 +622,8 @@ int main() {
 		// End recording and submit command buffer
 		VKASSERT(vkEndCommandBuffer(commandBuffer));
 
+		struct timespec firstTime, startTime, endTime;
+		clock_gettime(CLOCK_MONOTONIC, &firstTime);
 		for (unsigned runc = 0; runc < iterations; runc++) {
 
 			/*
@@ -657,20 +659,28 @@ int main() {
 				.pSignalSemaphores = nullptr
 			};
 
-			struct timespec startTime, endTime;
-			fprintf(stderr, "Starting Compute Queue %u\n", runc);
+			// fprintf(stderr, "Starting Compute Queue %u/%u\r", runc, iterations);
 			clock_gettime(CLOCK_MONOTONIC, &startTime);
+			// if (runc > 0)
+			// 	fprintf(stderr, "\tPrep took %gs\n", (startTime.tv_sec - endTime.tv_sec) + (startTime.tv_nsec - endTime.tv_nsec) / 1000000000.0);
 
-			// for (int i = 16; i; --i) {
-				VKASSERT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+			VKASSERT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
 
-				// Wait for queue completion and cleanup resources
-				VKASSERT(vkQueueWaitIdle(queue));
-			// }
+			// Wait for queue completion and cleanup resources
+			VKASSERT(vkQueueWaitIdle(queue));
 
 			clock_gettime(CLOCK_MONOTONIC, &endTime);
 
-			fprintf(stderr, "Compute Queue %u Finished after %gs\n", runc, (endTime.tv_sec - startTime.tv_sec) + (endTime.tv_nsec - startTime.tv_nsec) / 1000000000.0);
+			float thistime = (endTime.tv_sec - startTime.tv_sec) + (endTime.tv_nsec - startTime.tv_nsec) / 1000000000.0;
+			float avgtime  = ((endTime.tv_sec - firstTime.tv_sec) + (endTime.tv_nsec - firstTime.tv_nsec) / 1000000000.0) / (runc + 1);
+
+			double thistime_v, avgtime_v;
+			char thistime_s, avgtime_s;
+
+			siprefix10(thistime, thistime_v, thistime_s);
+			siprefix10(avgtime, avgtime_v, avgtime_s);
+
+			fprintf(stderr, "\r%u/%u: %g%cs, %g%cs average\e[K", runc, iterations, thistime_v, thistime_s, avgtime_v, avgtime_s);
 
 			/*
 			*****************************************
@@ -682,18 +692,28 @@ int main() {
 			for (unsigned i = 0; i < (work_size * work_size); i++) {
 				if ((outVals[i * out_count].x != 0) ||
 					(outVals[i * out_count].y != 0)) {
-					// printf("%u,%u: %g,%g\n", i / work_size, i % work_size, outVals[i * out_count].x, outVals[i * out_count].y);
+					// printf("{%u,%u: %g,%g}\t", i / work_size, i % work_size, outVals[i * out_count].x, outVals[i * out_count].y);
+					unsigned lastx = res + 1, lasty = res + 1;
 					for (unsigned j = 0; j < out_count; j++) {
 						// printf("       %g,%g\n", outVals[i * out_count + j].x, outVals[i * out_count + j].y);
-						if (fabs(outVals[i * out_count + j].x) >= 2)
-							break;
-						if (fabs(outVals[i * out_count + j].y) >= 2)
-							break;
-						unsigned x = (outVals[i * out_count + j].x + 2.0) / 4.0 * res;
-						unsigned y = (outVals[i * out_count + j].y + 2.0) / 4.0 * res;
-						// printf("[%u,%u]", x, y);
-						imgfl[x + (res * y)] += 1;
+						if ((fabs(outVals[i * out_count + j].x) < 2) &&
+							(fabs(outVals[i * out_count + j].y) < 2)) {
+							unsigned x = ((outVals[i * out_count + j].x + 2.0) / 4.0) * res;
+							unsigned y = ((outVals[i * out_count + j].y + 2.0) / 4.0) * res;
+							if (((x != 4096) || (y != 4096)) && ((x != lastx) && (y != lasty))) {
+								// printf("[%u,%u]", x, y);
+								imgfl[x + (res * y)] += 1;
+								lastx = x;
+								lasty = y;
+							}
+						}
+						else
+							j = out_count;
 					}
+					// printf("\n");
+				}
+				else {
+					// printf("{%u,%u: %g,%g}\t", i / work_size, i % work_size, outVals[i * out_count].x, outVals[i * out_count].y);
 				}
 			}
 
@@ -729,7 +749,8 @@ int main() {
 		vkDestroyInstance(instance, nullptr);
 	}
 
-	{
+	// tall poppy syndrome
+	if (0) {
 		imgfl_t max = 0, max2 = 0;
 		for (unsigned i = 0; i < (res * res); i++) {
 			if (imgfl[i] > max)
@@ -739,10 +760,12 @@ int main() {
 		}
 		printf("max is %u, max2 is %u\n", max, max2);
 
-		// tall poppy syndrome
 		for (unsigned i = 0; i < (res * res); i++) {
-			if (imgfl[i] > max / 10)
-				imgfl[i] = 0;
+			if (imgfl[i] >= max)
+				// imgfl[i] = 0;
+				printf("[%u,%u]", i % res, i / res);
+			else if (imgfl[i] >= max2)
+				printf("(%u,%u)", i % res, i / res);
 		}
 	}
 
@@ -780,11 +803,19 @@ int main() {
 		} rgb_t;
 
 		rgb_t palette[256];
-		for (unsigned i = 0; i < 256; i++)
+		for (unsigned i = 0; i < 256; i++) {
 			// palette[i] = {(unsigned char) i, (unsigned char) i, (unsigned char) i, (unsigned char)((i == 0)?0:255)};
-			palette[i] = {(unsigned char) i, (unsigned char) i, (unsigned char) i};
-		palette[1] = {0, 0, 0};
-		palette[2] = {0, 0, 0};
+			// palette[i] = {(unsigned char) i, (unsigned char) i, (unsigned char) i};
+			double j = i / 255.0;
+			palette[i] = {
+				(unsigned char)(pow(j, 3.0) * 255),
+				(unsigned char)((j - pow(j * 0.9, 3.0) - pow(j * 0.88, 10.0)) * 0.75 * 255),
+				(unsigned char)((pow(j, 1.0/2) - pow(j, 3.0) - pow(j, 10.0)) * 0.5 * 255)
+			};
+			// printf("\t[%u → %u,%u,%u]\n", i, palette[i].r, palette[i].g, palette[i].b);
+		}
+		// palette[1] = {0, 0, 0};
+		// palette[2] = {0, 0, 0};
 
 		rgb_t* img = new rgb_t[res*res];
 		for (unsigned i = 0; i < (res * res); i++) {
